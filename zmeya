@@ -1,0 +1,207 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+class Program
+{
+    static int width = 20;
+    static int height = 10;
+    static Queue<Point> snake = new Queue<Point>();
+    static Point direction = new Point(1, 0);
+    static Point food = new Point();
+    static bool gameOver = false;
+    static Random random = new Random();
+    static object consoleLock = new object();
+    static char[,] buffer = new char[width * 2, height + 1];
+
+    static async Task Main()
+    {
+        Console.CursorVisible = false;
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+        InitializeGame();
+
+        var inputTask = Task.Run(ReadInput);
+        var moveTask = Task.Run(MoveSnake);
+
+        await Task.WhenAny(inputTask, moveTask);
+
+        Console.Clear();
+        Console.WriteLine("Game Over! Your score: " + (snake.Count - 1));
+    }
+
+    static void InitializeGame()
+    {
+        Console.SetWindowSize(width * 2, height + 1);
+
+        snake.Enqueue(new Point(0, 0));
+        food = GenerateFood();
+        Draw();
+    }
+
+    static void Draw()
+    {
+        lock (consoleLock)
+        {
+            for (int y = 0; y < height + 1; y++)
+            {
+                for (int x = 0; x < width * 2; x++)
+                {
+                    buffer[x, y] = ' ';
+                }
+            }
+
+            foreach (var point in snake)
+            {
+                var headChar = point.Equals(snake.Last()) ? GetHeadChar() : '■';
+                buffer[point.X * 2, point.Y] = headChar;
+            }
+
+            buffer[food.X * 2, food.Y] = '🍌';
+
+            for (int y = 0; y < height + 1; y++)
+            {
+                for (int x = 0; x < width * 2; x++)
+                {
+                    Console.SetCursorPosition(x, y);
+                    Console.Write(buffer[x, y]);
+                }
+            }
+        }
+    }
+
+    static char GetHeadChar()
+    {
+        if (direction.X == 1) return '▶';
+        if (direction.X == -1) return '◀';
+        if (direction.Y == 1) return '▼';
+        if (direction.Y == -1) return '▲';
+        return '■'; // Default character
+    }
+
+    static async Task ReadInput()
+    {
+        while (!gameOver)
+        {
+            if (Console.KeyAvailable)
+            {
+                var key = Console.ReadKey(intercept: true).Key;
+                ChangeDirection(key);
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    static async Task MoveSnake()
+    {
+        while (!gameOver)
+        {
+            var newHead = new Point(snake.Last().X + direction.X, snake.Last().Y + direction.Y);
+
+            if (newHead.X < 0 || newHead.X >= width || newHead.Y < 0 || newHead.Y >= height)
+            {
+                gameOver = true;
+                break;
+            }
+
+            if (snake.Contains(newHead))
+            {
+                gameOver = true;
+                break;
+            }
+
+            lock (consoleLock)
+            {
+                snake.Enqueue(newHead);
+
+                if (newHead.X == food.X && newHead.Y == food.Y)
+                {
+                    food = GenerateFood();
+                }
+                else
+                {
+                    snake.Dequeue();
+                }
+
+                Draw();
+            }
+
+            await Task.Delay(100);
+        }
+    }
+
+    static Point GenerateFood()
+    {
+        int x, y;
+
+        do
+        {
+            x = random.Next(width);
+            y = random.Next(height);
+        } while (snake.Contains(new Point(x, y)));
+
+        return new Point(x, y);
+    }
+
+    static void ChangeDirection(ConsoleKey key)
+    {
+        switch (key)
+        {
+            case ConsoleKey.UpArrow:
+                if (direction.Y == 0)
+                {
+                    direction = new Point(0, -1);
+                }
+                break;
+            case ConsoleKey.DownArrow:
+                if (direction.Y == 0)
+                {
+                    direction = new Point(0, 1);
+                }
+                break;
+            case ConsoleKey.LeftArrow:
+                if (direction.X == 0)
+                {
+                    direction = new Point(-1, 0);
+                }
+                break;
+            case ConsoleKey.RightArrow:
+                if (direction.X == 0)
+                {
+                    direction = new Point(1, 0);
+                }
+                break;
+        }
+    }
+
+    struct Point
+    {
+        public int X;
+        public int Y;
+
+        public Point(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is Point other)
+            {
+                return X == other.X && Y == other.Y;
+            }
+
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(X, Y);
+        }
+    }
+}
+
