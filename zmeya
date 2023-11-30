@@ -59,7 +59,7 @@ class Program
                 buffer[point.X * 2, point.Y] = headChar;
             }
 
-            buffer[food.X * 2, food.Y] = '🍌';
+            buffer[food.X * 2, food.Y] = '1';
 
             for (int y = 0; y < height + 1; y++)
             {
